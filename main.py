@@ -1,71 +1,112 @@
 import pygame
 import sys
-import math
 
+# Inicializar Pygame
 pygame.init()
 
+# Dimensiones de la pantalla
 WIDTH, HEIGHT = 600, 800
 RADIUS = 30
 LINE_WIDTH = 5
-COLOR_BACKGROUND = (255, 255, 255)
+
+# Colores
+COLOR_BACKGROUND = (240, 240, 240)
 COLOR_LINES = (0, 0, 0)
 COLOR_PLAYER = (200, 0, 0)
 COLOR_AI = (0, 200, 0)
-COLOR_EMPTY = (240, 240, 240)
+COLOR_EMPTY = (255, 255, 255)
 
+# Configurar la pantalla
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Group 3")
+pygame.display.set_caption("Alinea en la I")
 
-VERTICES = [
-    (WIDTH // 2 - 150, 100), (WIDTH // 2, 100), (WIDTH // 2 + 150, 100),
-    (WIDTH // 2 - 150, 300), (WIDTH // 2, 300),
-    (WIDTH // 2, 500), (WIDTH // 2 + 150, 500),
-    (WIDTH // 2 - 150, 700), (WIDTH // 2, 700), (WIDTH // 2 + 150, 700)
+# Definir los nodos y sus posiciones
+nodes = {
+    0: {'pos': (WIDTH // 2 - 150, 100)},
+    1: {'pos': (WIDTH // 2, 100)},
+    2: {'pos': (WIDTH // 2 + 150, 100)},
+    3: {'pos': (WIDTH // 2 - 150, 300)},
+    4: {'pos': (WIDTH // 2, 300)},
+    5: {'pos': (WIDTH // 2, 500)},
+    6: {'pos': (WIDTH // 2 + 150, 500)},
+    7: {'pos': (WIDTH // 2 - 150, 700)},
+    8: {'pos': (WIDTH // 2, 700)},
+    9: {'pos': (WIDTH // 2 + 150, 700)}
+}
+
+# Definir las conexiones (aristas) entre los nodos
+edges = [
+    (0, 1), (1, 2),       # Conexiones horizontales superiores
+    (1, 4),               # Conexión vertical del centro superior
+    (3, 4), (4, 5),       # Conexiones en la parte media
+    (5, 6),               # Conexión horizontal inferior en la parte media
+    (4, 8),               # Conexión vertical del centro inferior
+    (7, 8), (8, 9)        # Conexiones horizontales inferiores
 ]
 
-CONNECTIONS = [
-    (0, 1), (1, 2),
-    (1, 4),
-    (3, 4), (4, 5), (5, 6),
-    (4, 8),
-    (7, 8), (8, 9)
-]
+# Crear el grafo como un diccionario de listas de adyacencia
+graph = {node: [] for node in nodes}
+print(graph)
+for edge in edges:
+    a, b = edge
+    graph[a].append(b)
+    graph[b].append(a)
 
-board = [-1] * len(VERTICES)
+# Estado inicial del tablero (-1: vacío, 0: jugador, 1: IA)
+board = {node: -1 for node in nodes}
+
 PLAYER_TURN = 0
 AI_TURN = 1
 turn = PLAYER_TURN
 game_over = False
+placing_phase = True
+selected_piece = None
 player_pieces = 0
 ai_pieces = 0
-selected_piece = None
 
 
 def draw_board():
     screen.fill(COLOR_BACKGROUND)
-    for conn in CONNECTIONS:
-        pygame.draw.line(screen, COLOR_LINES, VERTICES[conn[0]], VERTICES[conn[1]], LINE_WIDTH)
-    for i, pos in enumerate(VERTICES):
-        if board[i] == -1:
-            pygame.draw.circle(screen, COLOR_EMPTY, pos, RADIUS)
-        elif board[i] == 0:
-            pygame.draw.circle(screen, COLOR_PLAYER, pos, RADIUS)
-        elif board[i] == 1:
-            pygame.draw.circle(screen, COLOR_AI, pos, RADIUS)
+    for edge in edges:
+        a, b = edge
+        pygame.draw.line(screen, COLOR_LINES, nodes[a]['pos'], nodes[b]['pos'], LINE_WIDTH)
+    for node in nodes:
+        pos = nodes[node]['pos']
+        state = board[node]
+        if state == -1:
+            color = COLOR_EMPTY
+        elif state == 0:
+            color = COLOR_PLAYER
+        else:
+            color = COLOR_AI
+        pygame.draw.circle(screen, color, pos, RADIUS)
 
 
-def get_clicked_vertex(pos):
-    for i, vertex in enumerate(VERTICES):
-        if math.dist(pos, vertex) <= RADIUS:
-            return i
+def get_clicked_node(pos):
+    for node in nodes:
+        node_pos = nodes[node]['pos']
+        distance = ((pos[0] - node_pos[0]) ** 2 + (pos[1] - node_pos[1]) ** 2) ** 0.5
+        if distance <= RADIUS:
+            return node
     return None
 
 
 def is_winner(player):
-    return (
-        all(board[i] == player for i in [0, 1, 2]) or
-        all(board[i] == player for i in [7, 8, 9])
-    )
+    top_row = [0, 1, 2]
+    bottom_row = [7, 8, 9]
+    return all(board[node] == player for node in top_row) or all(board[node] == player for node in bottom_row)
+
+
+def valid_moves(node):
+    return [neighbor for neighbor in graph[node] if board[neighbor] == -1]
+
+
+def has_valid_moves(player):
+    for node in board:
+        if board[node] == player:
+            if valid_moves(node):
+                return True
+    return False
 
 
 def evaluate():
@@ -73,62 +114,69 @@ def evaluate():
         return 10
     elif is_winner(0):
         return -10
-    return 0
+    else:
+        return 0
 
 
 def minimax(depth, maximizing):
     score = evaluate()
-    if score == 10 or score == -10:
+    if score != 0 or depth == 0:
         return score
-    if all(b != -1 for b in board):
-        return 0
-
     if maximizing:
-        max_eval = -math.inf
-        for i in range(len(board)):
-            if board[i] == -1:
-                board[i] = 1
-                eval = minimax(depth - 1, False)
-                board[i] = -1
-                max_eval = max(max_eval, eval)
+        max_eval = float('-inf')
+        for node in board:
+            if board[node] == 1:
+                for move in valid_moves(node):
+                    board[node], board[move] = -1, 1
+                    eval = minimax(depth - 1, False)
+                    board[move], board[node] = -1, 1
+                    max_eval = max(max_eval, eval)
         return max_eval
     else:
-        min_eval = math.inf
-        for i in range(len(board)):
-            if board[i] == -1:
-                board[i] = 0
-                eval = minimax(depth - 1, True)
-                board[i] = -1
-                min_eval = min(min_eval, eval)
+        min_eval = float('inf')
+        for node in board:
+            if board[node] == 0:
+                for move in valid_moves(node):
+                    board[node], board[move] = -1, 0
+                    eval = minimax(depth - 1, True)
+                    board[move], board[node] = -1, 0
+                    min_eval = min(min_eval, eval)
         return min_eval
 
 
-def ai_move():
+def ai_place_piece():
     global ai_pieces
+    best_score = float('-inf')
     best_move = None
-    best_score = -math.inf
-
-    for i in range(len(board)):
-        if board[i] == -1:
-            board[i] = 1
-            score = minimax(3, False)
-            board[i] = -1
+    for node in board:
+        if board[node] == -1:
+            board[node] = 1
+            score = minimax(4, False)
+            board[node] = -1
             if score > best_score:
                 best_score = score
-                best_move = i
-
+                best_move = node
     if best_move is not None:
-        if ai_pieces < 3:
-            board[best_move] = 1
-            ai_pieces += 1
-        else:
-            for j in range(len(board)):
-                if board[j] == 1:
-                    for conn in CONNECTIONS:
-                        if conn[0] == j and conn[1] == best_move:
-                            board[j] = -1
-                            board[best_move] = 1
-                            return
+        board[best_move] = 1
+        ai_pieces += 1
+
+
+def ai_move():
+    best_score = float('-inf')
+    best_move = None
+    for node in board:
+        if board[node] == 1:
+            for move in valid_moves(node):
+                board[node], board[move] = -1, 1
+                score = minimax(3, False)
+                board[move], board[node] = -1, 1
+                if score > best_score:
+                    best_score = score
+                    best_move = (node, move)
+    if best_move is not None:
+        from_node, to_node = best_move
+        board[from_node], board[to_node] = -1, 1
+        print(f"IA mueve de {from_node} a {to_node}")
 
 
 while True:
@@ -141,38 +189,48 @@ while True:
             sys.exit()
 
         if not game_over:
-            if turn == PLAYER_TURN and event.type == pygame.MOUSEBUTTONDOWN:
-                clicked_vertex = get_clicked_vertex(event.pos)
-                if clicked_vertex is not None:
-                    if player_pieces < 3 and board[clicked_vertex] == -1:
-                        board[clicked_vertex] = 0
-                        player_pieces += 1
-                        if is_winner(0):
-                            print("Player wins!")
-                            game_over = True
-                        else:
+            if placing_phase:
+                if turn == PLAYER_TURN:
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        clicked_node = get_clicked_node(event.pos)
+                        if clicked_node is not None and board[clicked_node] == -1:
+                            board[clicked_node] = 0
+                            player_pieces += 1
+                            if player_pieces == 3 and ai_pieces == 3:
+                                placing_phase = False
                             turn = AI_TURN
-                    elif player_pieces == 3:
-                        if selected_piece is None and board[clicked_vertex] == 0:
-                            selected_piece = clicked_vertex
-                        elif selected_piece is not None and board[clicked_vertex] == -1:
-                            for conn in CONNECTIONS:
-                                if (conn[0] == selected_piece and conn[1] == clicked_vertex) or \
-                                (conn[1] == selected_piece and conn[0] == clicked_vertex):
-                                    board[selected_piece] = -1
-                                    board[clicked_vertex] = 0
+                elif turn == AI_TURN:
+                    ai_place_piece()
+                    if player_pieces == 3 and ai_pieces == 3:
+                        placing_phase = False
+                    turn = PLAYER_TURN
+            else:
+                if turn == PLAYER_TURN:
+                    if not has_valid_moves(0):
+                        print("Jugador no tiene movimientos válidos. Turno perdido.")
+                        turn = AI_TURN
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        clicked_node = get_clicked_node(event.pos)
+                        if clicked_node is not None:
+                            if selected_piece is None and board[clicked_node] == 0:
+                                selected_piece = clicked_node
+                            elif selected_piece is not None and board[clicked_node] == -1:
+                                if clicked_node in graph[selected_piece]:
+                                    board[selected_piece], board[clicked_node] = -1, 0
                                     selected_piece = None
                                     if is_winner(0):
-                                        print("Player wins!")
+                                        print("¡Jugador gana!")
                                         game_over = True
                                     else:
                                         turn = AI_TURN
-                                    break
-
-            if turn == AI_TURN and not game_over:
-                ai_move()
-                if is_winner(1):
-                    print("AI wins!")
-                    game_over = True
-                else:
-                    turn = PLAYER_TURN
+                elif turn == AI_TURN:
+                    if not has_valid_moves(1):
+                        print("IA no tiene movimientos válidos. Turno perdido.")
+                        turn = PLAYER_TURN
+                    else:
+                        ai_move()
+                        if is_winner(1):
+                            print("¡IA gana!")
+                            game_over = True
+                        else:
+                            turn = PLAYER_TURN
