@@ -1,26 +1,21 @@
 import pygame
 import sys
 
-# Inicializar Pygame
 pygame.init()
 
-# Dimensiones de la pantalla
 WIDTH, HEIGHT = 600, 800
 RADIUS = 30
 LINE_WIDTH = 5
 
-# Colores
 COLOR_BACKGROUND = (240, 240, 240)
 COLOR_LINES = (0, 0, 0)
 COLOR_PLAYER = (200, 0, 0)
 COLOR_AI = (0, 200, 0)
 COLOR_EMPTY = (255, 255, 255)
 
-# Configurar la pantalla
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Alinea en la I")
 
-# Definir los nodos y sus posiciones
 nodes = {
     0: {'pos': (WIDTH // 2 - 150, 100)},
     1: {'pos': (WIDTH // 2, 100)},
