@@ -41,12 +41,10 @@ edges = [
 
 # Crear el grafo como un diccionario de listas de adyacencia
 graph = {node: [] for node in nodes}
-print(graph)
 for edge in edges:
     a, b = edge
     graph[a].append(b)
     graph[b].append(a)
-
 # Estado inicial del tablero (-1: vacío, 0: jugador, 1: IA)
 board = {node: -1 for node in nodes}
 
@@ -104,19 +102,29 @@ def has_valid_moves(player):
     return False
 
 
-def evaluate():
-    if is_winner(1):
-        return 10
-    elif is_winner(0):
-        return -10
-    else:
-        return 0
+def heuristic():
+    # Contar fichas alineadas
+    ia_aligned = sum(1 for node in [0, 1, 2] if board[node] == 1)
+    player_aligned = sum(1 for node in [7, 8, 9] if board[node] == 0)
+
+    # Contar movimientos disponibles
+    ia_moves = sum(len(valid_moves(node)) for node in board if board[node] == 1)
+    player_moves = sum(len(valid_moves(node)) for node in board if board[node] == 0)
+
+    # Contar fichas bloqueadas
+    ia_blocked = sum(1 for node in board if board[node] == 1 and not valid_moves(node))
+    player_blocked = sum(1 for node in board if board[node] == 0 and not valid_moves(node))
+
+    # Calcular puntaje
+    score = (10 * ia_aligned - 10 * player_aligned +
+             3 * ia_moves - 3 * player_moves -
+             5 * ia_blocked + 5 * player_blocked)
+    return score
 
 
 def minimax(depth, maximizing):
-    score = evaluate()
-    if score != 0 or depth == 0:
-        return score
+    if depth == 0 or is_winner(1) or is_winner(0):
+        return heuristic()
     if maximizing:
         max_eval = float('-inf')
         for node in board:
@@ -146,7 +154,7 @@ def ai_place_piece():
     for node in board:
         if board[node] == -1:
             board[node] = 1
-            score = minimax(4, False)
+            score = minimax(3, False)
             board[node] = -1
             if score > best_score:
                 best_score = score
